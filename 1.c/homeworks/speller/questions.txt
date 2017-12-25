@@ -1,0 +1,16 @@
+0.  It's the longuest word in the english dictionnary (and a lung disease cause by fine dust).
+1.  Get and return system ressource usage measures (time, size).
+2.  16.
+3.  To save memory, only the adress is copied, and not all the rusage struct values.
+4.  For char of the file : 
+    1. if char is alpha or apostrophe, then push it to the word array, then increment the index
+    2. else if index > 45 (size if the longuest word in english), then it's not a word, and index is reset to 0
+    3. else if char is digit : not a word, and reset index to 0
+    4. else if index > 0 (and char not alpha or apostrophe) : 
+    4.1. put end of word in word array
+    4.2. count a new word in words counter
+    4.3. check if misspelled and benchmark the check
+    4.4. print the misspelled word if misspelled
+    4.5. set index to 0 for new word
+5.  scanf stops if it encounter an "unknown" char, but all the read values lay in the buffer, and it must be emptied.
+6.  Word and dictionnary don't have to be changed in check and load program, so they are declared constant.

@@ -1,0 +1,36 @@
+- every nodes contains an array of nodes pointers
+    + one for every letters in alphabets + '\''
+    + each element in the array point to another node
+        * if that node is NULL, then that letter isn't the next letter in any word in that sequence
+- every nodes indicates wether it's the last char of a word
+
+Code :
+    typedef struct node
+    {
+        bool is_word;
+        struct node *children[27];
+    }
+    node;
+
+Declare a new root for a new trie :
+    node *root:
+
+Load a word :
+- for every word in dictionnary, iterate through the trie
+- each element in children represent a different letter
+- check the value at children :
+    + if NULL, malloc a new node, have children[i] point to new node
+    + if !NULL, move to new node and iterate
+- if at end of word set is_word to true
+
+Exemple : store "fox" in trie
+f : root -> children[5]
+o : root -> children[5] -> children[14]
+x : root -> children[5] -> children[14] -> children[23] and is_word = true;
+
+Store "foo"
+only one node to create o : root -> children[5] -> children[14] -> children[14] and is_word = true;
+
+NB : 
+- ALWAYS check if malloc return NULL - memory empty...
+- if word "fo", just run the nodes (already created by"fox"), then set is_word = true in the first "o"
