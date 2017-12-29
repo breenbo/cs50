@@ -1,0 +1,7 @@
+#! /usr/bin/python3
+
+with open("positive-words.txt","r") as lines:
+    for line in lines:
+        print(line)
+
+test = 0

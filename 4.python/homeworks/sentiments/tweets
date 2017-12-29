@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+
+# TODO
+import sys
+import os
+
+# tool to analyze tweets
+from analyzer import Analyzer
+# tool to colorize answer
+from termcolor import colored
+# tool to get user timeline
+from helpers import get_user_timeline
+
+
+def main():
+    # take only one cli arguments : screen user name
+    # queries twitter API with screen name for lasts 50 tweets
+    # analyze sentiment of each tweet
+    # output each tweet's score and text, colored in green, yellow or red
+
+    # get_user_timeline from helpers
+    # check if successful, sys.exit and display error message if not
+
+    if len(sys.argv) != 2:
+        sys.exit("Usage: ./tweets screen_user_name")
+
+    nb_tweets = 50
+    screen_name = sys.argv[1]
+
+    # get tweets with get_user_timeline() from helpers
+    try:
+        tweets = get_user_timeline(screen_name, nb_tweets)
+        if tweets is None:
+            sys.exit(
+                "Unable to retrieve " +
+                screen_name +
+                " tweets, private account or rate limit reached.")
+    except RuntimeError:
+        sys.exit("Invalid API_KEY and/or API_SECRET")
+    # print some hint that try has no errors
+    else:
+        print("Tweets saved, begin analysis...\n")
+
+
+    # absolute paths to lists
+    positives = os.path.join(sys.path[0], "positive-words.txt")
+    negatives = os.path.join(sys.path[0], "negative-words.txt")
+
+    # instantiate analyzer
+    analyzer = Analyzer(positives, negatives)
+
+    # analyze every words of every tweets, then give the final score of tweet
+    for tweet in tweets:
+        score = analyzer.analyze(tweet)
+        if score > 0.0:
+            print(colored("Score : " + str(score) + "\n" + tweet, "green"))
+        elif score < 0.0:
+            print(colored("Score : " + str(score) + "\n" + tweet, "red"))
+        else:
+            print(colored("Score : " + str(score) + "\n" + tweet, "yellow"))
+
+
+if __name__ == "__main__":
+    main()
