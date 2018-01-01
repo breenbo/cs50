@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Stock value
+{% endblock %}
+
+{% block main %}
+    <div class"alert alert-success">
+        <h1>Stock value of {{ result.symbol}}</h1>
+    </div>
+    <h3>Name : {{ result.name }}</h3>
+    <h3>Price : {{ result.price }}</h3>
+{% endblock %}
