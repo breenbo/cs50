@@ -8,6 +8,7 @@ from helpers import apology, login_required, lookup, usd
 
 # configure application
 app = Flask(__name__)
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 # ensure responses aren't cached
 if app.config["DEBUG"]:
@@ -41,7 +42,69 @@ def index():
 @login_required
 def buy():
     """Buy shares of stock."""
-    return apology("TODO")
+    # change below iot have general behaviour
+    # use user_id stored by the login def in session["user_id"]
+    user_info = db.execute("SELECT cash FROM users WHERE id = :id",
+                           id=session["user_id"])
+    savings = user_info[0]["cash"]
+    # store savings in session variable
+    session["savings"] = savings
+    # retrieve stock price with lookup function
+    quote = True
+    if request.method == "POST":
+        if request.form["stock"] == "":
+            # Personnel enhancement
+            #  quote = False
+            #  return render_template("buy.html", quote=quote, savings=savings)
+            return apology("Please enter a valid stock symbol")
+
+        symbol = request.form["stock"]
+        # only one request, parse result in html with {{ result.subresult }}
+        result = lookup(symbol)
+        # store result in session variable iot use later
+        session["result"] = result
+        if result is None:
+            return apology("Sorry, unable to find the stock")
+
+        return render_template("buy.html", savings=savings, result=result,
+                               quote=quote)
+
+    if request.method == "GET":
+        return render_template("buy.html", savings=savings, quote=quote)
+
+
+@app.route("/bought", methods=["POST"])
+@login_required
+def bought():
+    savings = session["savings"]
+    result = session["result"]
+    if request.form["shares"] == "":
+        return apology("Sorry, enter a number of share")
+    #  elif int(request.form["shares"]) < 0:
+    else:
+        # check if users has entered a positive integer
+        try:
+            # check if it's integer
+            int(request.form["shares"])
+        except:
+            return apology("Please enter an integer")
+        else:
+            # check if it's positive
+            if int(request.form["shares"]) < 0:
+                return apology("Please enter a positive integer")
+
+            # work with the datas now the user input is safe
+            # create some easy variables
+            stock_symbol = result["symbol"]
+            price = float(result["price"])
+            number_share = int(request.form["shares"])
+            customer_id = session["user_id"]
+            buy_amount = number_share * price
+            savings -= buy_amount
+            # store data of buy in database buy
+            # TODO
+            # add resume of bought done in html
+            return render_template("buy.html", savings=savings, result=result, quote=True)
 
 
 @app.route("/history")
@@ -49,6 +112,7 @@ def buy():
 def history():
     """Show history of transactions."""
     return apology("TODO")
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -73,7 +137,8 @@ def login():
                           username=request.form.get("username"))
 
         # ensure username exists and password is correct
-        if len(rows) != 1 or not pwd_context.verify(request.form.get("password"), rows[0]["hash"]):
+        if len(rows) != 1 or not pwd_context.verify(request.form.get("password"),
+                                                    rows[0]["hash"]):
             return apology("invalid username and/or password")
 
         # remember which user has logged in
@@ -104,18 +169,20 @@ def quote():
     """Get stock quote."""
     # if user get quote with GET (click on a link), display a form to demand
     # which user inputs for stock's symbol : quote.html
-    no_quote = False
+    quote = True
     if request.method == "POST":
         if request.form["symbol"] == "":
-            no_quote = True
-            return render_template("quote.html", no_quote=no_quote)
+            # Personnel enhancement
+            #  quote = False
+            #  return render_template("quote.html", quote=quote)
+            return apology("Please enter a valid stock symbol")
         symbol = request.form["symbol"]
         # only one request, parse result in html with {{ result.subresult }}
         result = lookup(symbol)
-        return render_template("quoted.html", result=result)
+        return render_template("quoted.html", result=result, quote=quote)
 
     if request.method == "GET":
-        return render_template("quote.html")
+        return render_template("quote.html", quote=quote)
 
 
 @app.route("/register", methods=["GET", "POST"])

@@ -1,13 +1,16 @@
-{% extends "layout.html" %}
+<!-- Extend quote.html iot have results just below the search form -->
+{% extends "quote.html" %}
 
-{% block title %}
-    Stock value
-{% endblock %}
-
-{% block main %}
-    <div class"alert alert-success">
-        <h1>Stock value of {{ result.symbol}}</h1>
+{% block results %}
+    <div class="panel-group">
+        <div class="panel panel-success">
+            <div class="panel-heading">
+                <h4>Stock value of {{ result.symbol}}</h4>
+            </div>
+            <div class="panel-body">
+                <h4>Name : {{ result.name }}</h4>
+                <h4>Price : {{ result.price }} $</h4>
+            </div>
+        </div>
     </div>
-    <h3>Name : {{ result.name }}</h3>
-    <h3>Price : {{ result.price }}</h3>
 {% endblock %}
