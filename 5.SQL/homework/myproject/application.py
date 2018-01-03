@@ -35,6 +35,7 @@ db = SQL("sqlite:///finance.db")
 @app.route("/")
 @login_required
 def index():
+    username = session["username"]
     return apology("TODO")
 
 
@@ -101,10 +102,25 @@ def bought():
             customer_id = session["user_id"]
             buy_amount = number_share * price
             savings -= buy_amount
-            # store data of buy in database buy
-            # TODO
-            # add resume of bought done in html
-            return render_template("buy.html", savings=savings, result=result, quote=True)
+            # return apology if total bought price > savings
+            if savings < 0:
+                return apology("Sorry, you're to poor for that...")
+            # store data of buy in database 'buy' to validate the buy
+            db.execute("INSERT INTO buy (customer_id, stock_symbol, " +
+                       "price, number_share, date_time) VALUES (:customer_id," +
+                       " :stock_symbol, :price, :number_share, " +
+                       "datetime('now', 'localtime'))",
+                       customer_id=customer_id,
+                       stock_symbol=stock_symbol,
+                       price=price,
+                       number_share=number_share)
+            # update amount of available cash ( = savings )
+            db.execute("UPDATE users SET cash=:savings WHERE id=:customer_id",
+                       savings=savings,
+                       customer_id=customer_id)
+
+            return render_template("buy.html", savings=savings, result=result,
+                                   quote=True)
 
 
 @app.route("/history")
@@ -143,6 +159,7 @@ def login():
 
         # remember which user has logged in
         session["user_id"] = rows[0]["id"]
+        session["user_name"] = rows[0]["username"]
 
         # redirect user to home page
         return redirect(url_for("index"))
@@ -194,7 +211,8 @@ def register():
         if request.form["username"] == "" or request.form["password"] == "":
             return apology("Please enter a name and a password.")
         # store name and hashed password in db users (username, hash)
-        db.execute("INSERT INTO users (username, hash) VALUES (:username, :password)",
+        db.execute("INSERT INTO users (username, hash) VALUES (:username," +
+                   " :password)",
                    username=request.form["username"],
                    password=pwd_context.hash(request.form["password"]))
         # then go to the login view to ensure a proper login
