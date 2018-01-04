@@ -54,5 +54,5 @@ main td
 }
 
 .panel {
-    box-shadow : 0 1vw 1vw 0 rgba(0, 0, 0, 0.2), 0 1vw 1vw 0 rgba(0, 0, 0, 0.19);
+    box-shadow : 0 0.5vw 0.5vw 0 rgba(0, 0, 0, 0.2), 0 0.5vw 0.5vw 0 rgba(0, 0, 0, 0.19);
 }

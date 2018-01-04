@@ -39,13 +39,21 @@ def index():
                            user_id=session["user_id"])
     # check the actual price of the portfolio's stock
     # list of stock_symbol, shares, actual price
+    potential_cash = 0
     for row in portfolio_rows:
-        row["price"] = lookup(row["stock_symbol"])["price"]
+        actual_price = lookup(row["stock_symbol"])["price"]
+        row["price"] = actual_price
+        potential_cash += actual_price * row["number_share"]
+        potential_cash = round(potential_cash, 2)
+
+    # set portfolio_rows as session to use in sell page
+    session["portfolio_rows"] = portfolio_rows
 
     return render_template("index.html",
                            username=session["user_name"].capitalize(),
                            cash=session["cash"],
-                           portfolio_rows=portfolio_rows)
+                           portfolio_rows=portfolio_rows,
+                           potential_cash=potential_cash)
 
 
 @app.route("/buy", methods=["GET", "POST"])
@@ -54,26 +62,32 @@ def buy():
     """Buy shares of stock."""
     # use variables stored by the login def in session[var]
     # retrieve stock price with lookup function
+    cash = session["cash"]
     quote = True
+    # set default number to display proper results headings
+    number = True
     if request.method == "POST":
         if request.form["stock"] == "":
             # Personnel enhancement
-            #  quote = False
-            #  return render_template("buy.html", quote=quote, savings=savings)
-            return apology("Please enter a valid stock symbol")
+            quote = False
+            return render_template("buy.html", quote=quote, cash=cash)
+            #  return apology("Please enter a valid stock symbol")
 
         symbol = request.form["stock"]
         # only one request, parse result in html with {{ result.subresult }}
         result = lookup(symbol)
+        if result is None:
+            quote = False
+            return render_template("buy.html", quote=quote, cash=cash)
+            #  return apology("Sorry, unable to find the stock")
         # store result in session variable iot use later
         session["result"] = result
-        if result is None:
-            return apology("Sorry, unable to find the stock")
 
         return render_template("buy.html",
-                               cash=session["cash"],
+                               cash=cash,
                                result=result,
-                               quote=quote)
+                               quote=quote,
+                               number=number)
 
     if request.method == "GET":
         return render_template("buy.html", cash=session["cash"], quote=quote)
@@ -82,23 +96,38 @@ def buy():
 @app.route("/bought", methods=["POST"])
 @login_required
 def bought():
+    number = True
+    success = False
     cash = session["cash"]
     result = session["result"]
     if request.form["shares"] == "":
-        return apology("Sorry, enter a number of share")
-    #  elif int(request.form["shares"]) < 0:
+        number = False
+        #  return apology("Sorry, enter a number of share")
     else:
         # check if users has entered a positive integer
         try:
             # check if it's integer
             int(request.form["shares"])
         except:
-            return apology("Please enter an integer")
+            number = False
+            return render_template("buy.html",
+                                cash=cash,
+                                result=result,
+                                quote=quote,
+                                number=number)
+            #  return apology("Please enter an integer")
         else:
             # check if it's positive
             if int(request.form["shares"]) < 0:
-                return apology("Please enter a positive integer")
+                number = False
+                return render_template("buy.html",
+                                    cash=cash,
+                                    result=result,
+                                    quote=quote,
+                                    number=number)
+                #  return apology("Please enter a positive integer")
 
+            number = True
             # work with the datas now the user input is safe
             # create some easy variables
             stock_symbol = result["symbol"]
@@ -107,6 +136,7 @@ def bought():
             user_id = session["user_id"]
             buy_amount = number_share * price
             cash -= buy_amount
+            cash = round(cash, 2)
             # update session["cash"] for later use
             session["cash"] = cash
             # return apology if total bought price > available cash
@@ -114,22 +144,6 @@ def bought():
                 return apology("Sorry, you're to poor for that...")
 
             # valid transaction
-            # create a buy_history table if not exist
-            db.execute("CREATE TABLE IF NOT EXISTS buy_history (" +
-                       " buy_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL," +
-                       " user_id INTEGER NOT NULL," +
-                       " stock_symbol TEXT NOT NULL," +
-                       " price FLOAT NOT NULL," +
-                       " number_share INTEGER," +
-                       " date_time TEXT NOT NULL," +
-                       " FOREIGN KEY(user_id) REFERENCES users(id))")
-            # create a portfolio table if not exist
-            db.execute("CREATE TABLE IF NOT EXISTS portfolio (" +
-                       " value_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL," +
-                       " user_id INTEGER NOT NULL," +
-                       " stock_symbol TEXT UNIQUE NOT NULL," +
-                       " number_share INTEGER," +
-                       " FOREIGN KEY(user_id) REFERENCES users(id))")
             # store data of buy in database 'buy_history' to validate the buy
             db.execute("INSERT INTO buy_history (" +
                        " user_id," +
@@ -153,7 +167,7 @@ def bought():
             shares = db.execute("SELECT number_share FROM portfolio" +
                                 " WHERE user_id = :user_id" +
                                 " AND stock_symbol = :stock_symbol",
-                                user_id=session["user_id"],
+                                user_id=user_id,
                                 stock_symbol=stock_symbol)
 
             # check if stock already in portfolio
@@ -187,8 +201,17 @@ def bought():
                        cash=cash,
                        user_id=user_id)
 
-            return render_template("buy.html", cash=cash, result=result,
-                                   quote=True)
+            # success var to display success message in buy.html
+            success = True
+
+            return render_template("buy.html",
+                                   cash=cash,
+                                   result=result,
+                                   quote=True,
+                                   number=number,
+                                   success=success,
+                                   number_share=number_share,
+                                   buy_amount=buy_amount)
 
 
 @app.route("/history")
@@ -228,7 +251,33 @@ def login():
         # remember some user info from database
         session["user_id"] = rows[0]["id"]
         session["user_name"] = rows[0]["username"]
-        session["cash"] = rows[0]["cash"]
+        session["cash"] = round(rows[0]["cash"], 2)
+
+        # create a buy_history table if not exist
+        db.execute("CREATE TABLE IF NOT EXISTS buy_history (" +
+                    " buy_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL," +
+                    " user_id INTEGER NOT NULL," +
+                    " stock_symbol TEXT NOT NULL," +
+                    " price FLOAT NOT NULL," +
+                    " number_share INTEGER," +
+                    " date_time TEXT NOT NULL," +
+                    " FOREIGN KEY(user_id) REFERENCES users(id))")
+        # create a sell_history table if not exist
+        db.execute("CREATE TABLE IF NOT EXISTS sell_history (" +
+                    " buy_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL," +
+                    " user_id INTEGER NOT NULL," +
+                    " stock_symbol TEXT NOT NULL," +
+                    " price FLOAT NOT NULL," +
+                    " number_share INTEGER," +
+                    " date_time TEXT NOT NULL," +
+                    " FOREIGN KEY(user_id) REFERENCES users(id))")
+        # create a portfolio table if not exist
+        db.execute("CREATE TABLE IF NOT EXISTS portfolio (" +
+                    " value_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL," +
+                    " user_id INTEGER NOT NULL," +
+                    " stock_symbol TEXT NOT NULL," +
+                    " number_share INTEGER," +
+                    " FOREIGN KEY(user_id) REFERENCES users(id))")
 
         # redirect user to home page
         return redirect(url_for("index"))
@@ -259,12 +308,15 @@ def quote():
     if request.method == "POST":
         if request.form["symbol"] == "":
             # Personnel enhancement
-            #  quote = False
-            #  return render_template("quote.html", quote=quote)
-            return apology("Please enter a valid stock symbol")
+            quote = False
+            return render_template("quote.html", quote=quote)
+            #  return apology("Please enter a valid stock symbol")
         symbol = request.form["symbol"]
         # only one request, parse result in html with {{ result.subresult }}
         result = lookup(symbol)
+        if result == None:
+            quote = False
+            return render_template("quote.html", quote=quote)
         return render_template("quoted.html", result=result, quote=quote)
 
     if request.method == "GET":
@@ -295,4 +347,18 @@ def register():
 @login_required
 def sell():
     """Sell shares of stock."""
-    return apology("TODO")
+    # set new variable with session var
+    portfolio_rows = session["portfolio_rows"]
+
+    # set var potential_cash
+    potential_cash = 0
+    # check every row in portfolio_rows and calculate global potential cash
+    for row in portfolio_rows:
+        actual_price = row["price"]
+        potential_cash += actual_price * row["number_share"]
+        potential_cash = round(potential_cash, 2)
+
+    return render_template("sell.html",
+                           cash=session["cash"],
+                           portfolio_rows=portfolio_rows,
+                           potential_cash=potential_cash)

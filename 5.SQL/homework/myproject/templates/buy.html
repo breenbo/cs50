@@ -22,10 +22,6 @@
                 <h4>Please enter a valid stock symbol :</h4>
             </div>
     {% endif %}
-        <!-- <div class="panel panel-info"> -->
-            <!-- <div class="panel-heading"> -->
-                <!-- <h4>Please choose a stock symbol :</h4> -->
-            <!-- </div> -->
             <div class="panel-body">
                 <form action="{{ url_for('buy') }}" method="post" class="form-inline">
                     <fieldset>
@@ -43,10 +39,17 @@
     </div>
     {% if result %}
         <div class="panel-group">
-            <div class="panel panel-success">
-                <div class="panel-heading">
-                    <h4>Stock value of {{ result.name }}</h4>
-                </div>
+            {% if number %}
+                <div class="panel panel-success">
+                    <div class="panel-heading">
+                        <h4>Stock value of {{ result.name }}</h4>
+                    </div>
+            {% else %}
+                <div class="panel panel-warning">
+                    <div class="panel-heading">
+                        <h4>Please enter a positive integer :</h4>
+                    </div>
+            {% endif %}
                 <div class="panel-body">
                     <h4>Price : {{ result.price }} $</h4>
                     <form class="form-inline" action="{{ url_for('bought') }}" method="post">
@@ -62,5 +65,12 @@
                 </div>
             </div>
         </div>
+        {% if success %}
+            <div class="panel panel-success">
+                <div class="panel-heading">
+                    <h4>You just purchased {{ number_share }} stocks of {{ result.name }} for {{ buy_amount }} $</h4>
+                </div>
+            </div>
+        {% endif %}
     {% endif %}
 {% endblock %}
