@@ -35,21 +35,24 @@ db = SQL("sqlite:///finance.db")
 @app.route("/")
 @login_required
 def index():
-    username = session["username"]
-    return apology("TODO")
+    portfolio_rows = db.execute("SELECT * FROM portfolio WHERE user_id=:user_id",
+                           user_id=session["user_id"])
+    # check the actual price of the portfolio's stock
+    # list of stock_symbol, shares, actual price
+    for row in portfolio_rows:
+        row["price"] = lookup(row["stock_symbol"])["price"]
+
+    return render_template("index.html",
+                           username=session["user_name"].capitalize(),
+                           cash=session["cash"],
+                           portfolio_rows=portfolio_rows)
 
 
 @app.route("/buy", methods=["GET", "POST"])
 @login_required
 def buy():
     """Buy shares of stock."""
-    # change below iot have general behaviour
-    # use user_id stored by the login def in session["user_id"]
-    user_info = db.execute("SELECT cash FROM users WHERE id = :id",
-                           id=session["user_id"])
-    savings = user_info[0]["cash"]
-    # store savings in session variable
-    session["savings"] = savings
+    # use variables stored by the login def in session[var]
     # retrieve stock price with lookup function
     quote = True
     if request.method == "POST":
@@ -67,17 +70,19 @@ def buy():
         if result is None:
             return apology("Sorry, unable to find the stock")
 
-        return render_template("buy.html", savings=savings, result=result,
+        return render_template("buy.html",
+                               cash=session["cash"],
+                               result=result,
                                quote=quote)
 
     if request.method == "GET":
-        return render_template("buy.html", savings=savings, quote=quote)
+        return render_template("buy.html", cash=session["cash"], quote=quote)
 
 
 @app.route("/bought", methods=["POST"])
 @login_required
 def bought():
-    savings = session["savings"]
+    cash = session["cash"]
     result = session["result"]
     if request.form["shares"] == "":
         return apology("Sorry, enter a number of share")
@@ -99,27 +104,90 @@ def bought():
             stock_symbol = result["symbol"]
             price = float(result["price"])
             number_share = int(request.form["shares"])
-            customer_id = session["user_id"]
+            user_id = session["user_id"]
             buy_amount = number_share * price
-            savings -= buy_amount
-            # return apology if total bought price > savings
-            if savings < 0:
+            cash -= buy_amount
+            # update session["cash"] for later use
+            session["cash"] = cash
+            # return apology if total bought price > available cash
+            if cash < 0:
                 return apology("Sorry, you're to poor for that...")
-            # store data of buy in database 'buy' to validate the buy
-            db.execute("INSERT INTO buy (customer_id, stock_symbol, " +
-                       "price, number_share, date_time) VALUES (:customer_id," +
-                       " :stock_symbol, :price, :number_share, " +
-                       "datetime('now', 'localtime'))",
-                       customer_id=customer_id,
+
+            # valid transaction
+            # create a buy_history table if not exist
+            db.execute("CREATE TABLE IF NOT EXISTS buy_history (" +
+                       " buy_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL," +
+                       " user_id INTEGER NOT NULL," +
+                       " stock_symbol TEXT NOT NULL," +
+                       " price FLOAT NOT NULL," +
+                       " number_share INTEGER," +
+                       " date_time TEXT NOT NULL," +
+                       " FOREIGN KEY(user_id) REFERENCES users(id))")
+            # create a portfolio table if not exist
+            db.execute("CREATE TABLE IF NOT EXISTS portfolio (" +
+                       " value_id INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE NOT NULL," +
+                       " user_id INTEGER NOT NULL," +
+                       " stock_symbol TEXT UNIQUE NOT NULL," +
+                       " number_share INTEGER," +
+                       " FOREIGN KEY(user_id) REFERENCES users(id))")
+            # store data of buy in database 'buy_history' to validate the buy
+            db.execute("INSERT INTO buy_history (" +
+                       " user_id," +
+                       " stock_symbol," +
+                       " price," +
+                       " number_share," +
+                       " date_time" +
+                       ")" +
+                       " VALUES (" +
+                       " :user_id," +
+                       " :stock_symbol," +
+                       " :price," +
+                       " :number_share," +
+                       " datetime('now', 'localtime')" +
+                       ")",
+                       user_id=user_id,
                        stock_symbol=stock_symbol,
                        price=price,
                        number_share=number_share)
-            # update amount of available cash ( = savings )
-            db.execute("UPDATE users SET cash=:savings WHERE id=:customer_id",
-                       savings=savings,
-                       customer_id=customer_id)
+            # check if stock already exist in portfolio
+            shares = db.execute("SELECT number_share FROM portfolio" +
+                                " WHERE user_id = :user_id" +
+                                " AND stock_symbol = :stock_symbol",
+                                user_id=session["user_id"],
+                                stock_symbol=stock_symbol)
 
-            return render_template("buy.html", savings=savings, result=result,
+            # check if stock already in portfolio
+            # if yes -> update number of shares
+            if len(shares) == 1:
+                shares = int(shares[0]["number_share"])
+                shares += number_share
+                db.execute("UPDATE portfolio SET number_share=:number_share" +
+                           " WHERE user_id=:user_id AND stock_symbol=:stock_symbol",
+                           number_share=shares,
+                           user_id=user_id,
+                           stock_symbol=stock_symbol)
+            # if no -> insert new stock in portfolio
+            else:
+                db.execute("INSERT INTO portfolio (" +
+                       " user_id," +
+                       " stock_symbol," +
+                       " number_share" +
+                       ")" +
+                       " VALUES (" +
+                       " :user_id," +
+                       " :stock_symbol," +
+                       " :number_share" +
+                       ")",
+                       user_id=user_id,
+                       stock_symbol=stock_symbol,
+                       number_share=number_share)
+
+            # update amount of available cash for user
+            db.execute("UPDATE users SET cash=:cash WHERE id=:user_id",
+                       cash=cash,
+                       user_id=user_id)
+
+            return render_template("buy.html", cash=cash, result=result,
                                    quote=True)
 
 
@@ -157,9 +225,10 @@ def login():
                                                     rows[0]["hash"]):
             return apology("invalid username and/or password")
 
-        # remember which user has logged in
+        # remember some user info from database
         session["user_id"] = rows[0]["id"]
         session["user_name"] = rows[0]["username"]
+        session["cash"] = rows[0]["cash"]
 
         # redirect user to home page
         return redirect(url_for("index"))

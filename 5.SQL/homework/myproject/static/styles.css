@@ -10,18 +10,22 @@
 .navbar-default .navbar-brand .blue
 {
     color: #537fbe;
+    font-size:3vw;
 }
 .navbar-default .navbar-brand .red
 {
     color: #ea433b;
+    font-size:3vw;
 }
 .navbar-default .navbar-brand .yellow
 {
     color: #f5b82e;
+    font-size:3vw;
 }
 .navbar-default .navbar-brand .green
 {
     color: #2e944b;
+    font-size:3vw;
 }
 
 main .form-control
@@ -43,4 +47,12 @@ main td
 {
     /* left-align tables' cells */
     text-align: left;
+}
+
+.text {
+    text-align: left;
+}
+
+.panel {
+    box-shadow : 0 1vw 1vw 0 rgba(0, 0, 0, 0.2), 0 1vw 1vw 0 rgba(0, 0, 0, 0.19);
 }

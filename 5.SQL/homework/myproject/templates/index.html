@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    Portfolio
+{% endblock %}
+
+{% block main %}
+    <div class="panel panel-primary">
+        <div class="panel-heading">
+            <h4>Welcome {{ username }}, nice to see you.</h4>
+        </div>
+        <div class="panel-body">
+            <div class="alert alert-info">
+                <h4 class="text">Your available cash : {{ cash }} $</h4>
+                <h4 class="text">Your potential savings : {{ sum }} $</h4>
+            </div>
+            <div class="alert alert-warning">
+                <h4>Your portfolio</h4>
+            </div>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Stock</th>
+                        <th>Shares</th>
+                        <th>Actual price</th>
+                        <th>Potential value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in portfolio_rows %}
+                        <tr>
+                            <td>{{ row.stock_symbol }}</td>
+                            <td>{{ row.number_share }}</td>
+                            <td>{{ row.price }} $</td>
+                            <td>{{ row.price * row.number_share }} $</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
