@@ -32,28 +32,59 @@ Session(app)
 db = SQL("sqlite:///finance.db")
 
 
-@app.route("/")
+@app.route("/", methods=["POST", "GET"])
 @login_required
+# add portfolio_buy here for post method ? and index() for get method ?
 def index():
-    portfolio_rows = db.execute("SELECT * FROM portfolio WHERE user_id=:user_id",
-                           user_id=session["user_id"])
-    # check the actual price of the portfolio's stock
-    # list of stock_symbol, shares, actual price
-    potential_cash = 0
-    for row in portfolio_rows:
-        actual_price = lookup(row["stock_symbol"])["price"]
-        row["price"] = actual_price
-        potential_cash += actual_price * row["number_share"]
-        potential_cash = round(potential_cash, 2)
+    if request.method == "GET":
+        # default view.
+        # contains a portfolio view
+        # update prices each time and store them in portfolio database
+        user_id = session["user_id"]
+        portfolio_rows = db.execute("SELECT * FROM portfolio" +
+                                    " WHERE user_id=:user_id",
+                                    user_id=user_id)
+        # check the actual price of the portfolio's stock
+        # list of stock_symbol, shares, actual price
+        potential_cash = 0
+        for row in portfolio_rows:
+            stock_symbol = row["stock_symbol"]
+            actual_price = lookup(stock_symbol)["price"]
+            # calculate the potential value of each stock
+            row["actual_price"] = actual_price
+            potential_cash += actual_price * row["number_share"]
+            potential_cash = round(potential_cash, 2)
+            potential_value = actual_price * row["number_share"]
+            # update stocks actual price in portfolio db
+            db.execute("UPDATE portfolio" +
+                       " SET" +
+                       " actual_price=:actual_price," +
+                       " potential_value=:potential_value," +
+                       " last_updated=datetime('now', 'localtime')" +
+                       " WHERE" +
+                       " user_id=:user_id" +
+                       " AND" +
+                       " stock_symbol=:stock_symbol",
+                       actual_price=actual_price,
+                       user_id=user_id,
+                       potential_value=potential_value,
+                       stock_symbol=stock_symbol)
 
-    # set portfolio_rows as session to use in sell page
-    session["portfolio_rows"] = portfolio_rows
+        # store the new database in portfolio_rows var
+        portfolio_rows = db.execute("SELECT * FROM portfolio" +
+                                    " WHERE user_id=:user_id",
+                                    user_id=user_id)
 
-    return render_template("index.html",
-                           username=session["user_name"].capitalize(),
-                           cash=session["cash"],
-                           portfolio_rows=portfolio_rows,
-                           potential_cash=potential_cash)
+        # set portfolio_rows as session to immediate use in sell page
+
+        return render_template("index.html",
+                               username=session["user_name"].capitalize(),
+                               cash=session["cash"],
+                               portfolio_rows=portfolio_rows,
+                               potential_cash=potential_cash)
+
+    elif request.method == "POST":
+        return apology("portfolio buy test")
 
 
 @app.route("/buy", methods=["GET", "POST"])
@@ -90,11 +121,14 @@ def buy():
                                number=number)
 
     if request.method == "GET":
-        return render_template("buy.html", cash=session["cash"], quote=quote)
+        return render_template("buy.html", cash=cash, quote=quote)
 
 
 @app.route("/bought", methods=["POST"])
 @login_required
+# finalize the purchase
+# check if inputs are correct
+# store data in buy_history and portfolio
 def bought():
     number = True
     success = False
@@ -111,20 +145,20 @@ def bought():
         except:
             number = False
             return render_template("buy.html",
-                                cash=cash,
-                                result=result,
-                                quote=quote,
-                                number=number)
+                                   cash=cash,
+                                   result=result,
+                                   quote=quote,
+                                   number=number)
             #  return apology("Please enter an integer")
         else:
             # check if it's positive
             if int(request.form["shares"]) < 0:
                 number = False
                 return render_template("buy.html",
-                                    cash=cash,
-                                    result=result,
-                                    quote=quote,
-                                    number=number)
+                                       cash=cash,
+                                       result=result,
+                                       quote=quote,
+                                       number=number)
                 #  return apology("Please enter a positive integer")
 
             number = True
@@ -135,6 +169,7 @@ def bought():
             number_share = int(request.form["shares"])
             user_id = session["user_id"]
             buy_amount = number_share * price
+            buy_amount = round(buy_amount, 2)
             cash -= buy_amount
             cash = round(cash, 2)
             # update session["cash"] for later use
@@ -175,26 +210,40 @@ def bought():
             if len(shares) == 1:
                 shares = int(shares[0]["number_share"])
                 shares += number_share
-                db.execute("UPDATE portfolio SET number_share=:number_share" +
-                           " WHERE user_id=:user_id AND stock_symbol=:stock_symbol",
+                db.execute("UPDATE portfolio" +
+                           " SET" +
+                           " number_share=:number_share," +
+                           " last_updated=datetime('now', 'localtime')" +
+                           " WHERE" +
+                           " user_id=:user_id" +
+                           " AND" +
+                           " stock_symbol=:stock_symbol",
                            number_share=shares,
                            user_id=user_id,
                            stock_symbol=stock_symbol)
             # if no -> insert new stock in portfolio
             else:
                 db.execute("INSERT INTO portfolio (" +
-                       " user_id," +
-                       " stock_symbol," +
-                       " number_share" +
-                       ")" +
-                       " VALUES (" +
-                       " :user_id," +
-                       " :stock_symbol," +
-                       " :number_share" +
-                       ")",
-                       user_id=user_id,
-                       stock_symbol=stock_symbol,
-                       number_share=number_share)
+                           " user_id," +
+                           " stock_symbol," +
+                           " number_share," +
+                           " actual_price," +
+                           " potential_value," +
+                           " last_updated" +
+                           ")" +
+                           " VALUES (" +
+                           " :user_id," +
+                           " :stock_symbol," +
+                           " :number_share," +
+                           " :actual_price," +
+                           " :potential_value," +
+                           " datetime('now', 'localtime')" +
+                           ")",
+                           user_id=user_id,
+                           stock_symbol=stock_symbol,
+                           number_share=number_share,
+                           actual_price=price,
+                           potential_value=buy_amount)
 
             # update amount of available cash for user
             db.execute("UPDATE users SET cash=:cash WHERE id=:user_id",
@@ -218,7 +267,17 @@ def bought():
 @login_required
 def history():
     """Show history of transactions."""
-    return apology("TODO")
+    user_id = session["user_id"]
+    # read buy and sell history, then display them in history.html
+    buy_history = db.execute("SELECT * FROM buy_history" +
+                             " WHERE user_id=:user_id",
+                             user_id=user_id)
+    sell_history = db.execute("SELECT * FROM sell_history" +
+                              " WHERE user_id=:user_id",
+                              user_id=user_id)
+    return render_template("history.html",
+                           buy_history=buy_history,
+                           sell_history=sell_history)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -277,6 +336,9 @@ def login():
                     " user_id INTEGER NOT NULL," +
                     " stock_symbol TEXT NOT NULL," +
                     " number_share INTEGER," +
+                    " actual_price FLOAT," +
+                    " potential_value FLOAT," +
+                    " last_updated TEXT NOT NULL," +
                     " FOREIGN KEY(user_id) REFERENCES users(id))")
 
         # redirect user to home page
@@ -327,10 +389,14 @@ def quote():
 def register():
     """Register user into database users."""
     # check if post method -> protect from get method
+    login = True
     if request.method == "POST":
         # check if register correct (non empty)
         if request.form["username"] == "" or request.form["password"] == "":
-            return apology("Please enter a name and a password.")
+            login = False
+            return render_template("register.html",
+                                   login=login)
+            #  return apology("Please enter a name and a password.")
         # store name and hashed password in db users (username, hash)
         db.execute("INSERT INTO users (username, hash) VALUES (:username," +
                    " :password)",
@@ -340,25 +406,135 @@ def register():
         return render_template("login.html")
     # else if user reached route via GET (as by clicking a link or via redirect)
     else:
-        return render_template("register.html")
+        return render_template("register.html",
+                               login=login)
 
 
 @app.route("/sell", methods=["GET", "POST"])
 @login_required
 def sell():
     """Sell shares of stock."""
-    # set new variable with session var
-    portfolio_rows = session["portfolio_rows"]
+    # query the database to have the last stored datas
+    user_id = session["user_id"]
+    cash = session["cash"]
+    portfolio_rows = db.execute("SELECT * FROM portfolio" +
+                                " WHERE user_id=:user_id",
+                                user_id=user_id)
 
-    # set var potential_cash
+    # display the portfolio
     potential_cash = 0
-    # check every row in portfolio_rows and calculate global potential cash
-    for row in portfolio_rows:
-        actual_price = row["price"]
-        potential_cash += actual_price * row["number_share"]
-        potential_cash = round(potential_cash, 2)
 
-    return render_template("sell.html",
-                           cash=session["cash"],
-                           portfolio_rows=portfolio_rows,
-                           potential_cash=potential_cash)
+    # use of form : request.form.get["input_name"] to have the number of stocks
+    # sold
+    # How to have the name of the stocks ? request.form.get["name"] != ""
+    # loop through all stock_symbol in database
+
+    if request.method == "POST":
+        # check if the stocks to be sold for each row of database
+        no_sold = False
+        for row in portfolio_rows:
+            # check every row and calculate global potential cash
+            actual_price = row["actual_price"]
+            potential_cash += actual_price * row["number_share"]
+            potential_cash = round(potential_cash, 2)
+
+            stock_symbol = row["stock_symbol"]
+            if request.form[stock_symbol] == "":
+                # do nothing, no stock to sold
+                # but recall that there is no integer in input
+                no_integer = True
+            else:
+                # check the user input
+                try:
+                    int(request.form[stock_symbol])
+                except:
+                    no_integer = True
+                    return render_template("sell.html",
+                                           cash=session["cash"],
+                                           portfolio_rows=portfolio_rows,
+                                           potential_cash=potential_cash,
+                                           no_sold=no_sold,
+                                           no_integer=no_integer)
+                else:
+                    no_integer = False
+                    #  sell the numbers of stock
+                    number_sold = int(request.form[stock_symbol])
+                    number_share = int(row["number_share"])
+                    if number_sold > number_share:
+                        no_sold = True
+                    # update the databases of sold stocks
+                    number_share -= number_sold
+                    price = float(row["actual_price"])
+                    potential_value = price * number_share
+                    potential_value = round(potential_value, 2)
+                    sold_amount = price * number_sold
+                    sold_amount = round(sold_amount, 2)
+                    # add sold_amount to user cash
+                    cash += sold_amount
+                    cash = round(cash, 2)
+                    session["cash"] = cash
+                    # update portfolio
+                    db.execute("UPDATE portfolio" +
+                               " SET" +
+                               " number_share=:number_share," +
+                               " potential_value=:potential_value," +
+                               " last_updated=datetime('now', 'localtime')" +
+                               " WHERE" +
+                               " user_id=:user_id" +
+                               " AND" +
+                               " stock_symbol=:stock_symbol",
+                               number_share=number_share,
+                               potential_value=potential_value,
+                               user_id=user_id,
+                               stock_symbol=stock_symbol)
+                    # update sell_history
+                    db.execute("INSERT INTO sell_history (" +
+                               " user_id," +
+                               " stock_symbol," +
+                               " price," +
+                               " number_share," +
+                               " date_time" +
+                               ")" +
+                               " VALUES (" +
+                               " :user_id," +
+                               " :stock_symbol," +
+                               " :price," +
+                               " :number_sold," +
+                               " datetime('now', 'localtime')" +
+                               ")",
+                               user_id=user_id,
+                               stock_symbol=stock_symbol,
+                               price=price,
+                               number_sold=number_sold)
+
+        # delete all rows with no shares
+        db.execute("DELETE FROM portfolio" +
+                   " WHERE number_share = 0")
+        # update cash
+        db.execute("UPDATE users SET cash=:cash WHERE id=:user_id",
+                   cash=cash,
+                   user_id=user_id)
+        # reload updated portfolio_rows before display
+        portfolio_rows = db.execute("SELECT * FROM portfolio" +
+                                    " WHERE user_id=:user_id",
+                                    user_id=user_id)
+
+        return render_template("sell.html",
+                               cash=session["cash"],
+                               portfolio_rows=portfolio_rows,
+                               potential_cash=potential_cash,
+                               no_sold=no_sold,
+                               no_integer=no_integer)
+    elif request.method == "GET":
+        # check every row in portfolio_rows and calculate global potential cash
+        for row in portfolio_rows:
+            actual_price = row["actual_price"]
+            potential_cash += actual_price * row["number_share"]
+            potential_cash = round(potential_cash, 2)
+
+        return render_template("sell.html",
+                               cash=session["cash"],
+                               portfolio_rows=portfolio_rows,
+                               potential_cash=potential_cash,
+                               no_sold=False,
+                               no_integer=False)

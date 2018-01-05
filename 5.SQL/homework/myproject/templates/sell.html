@@ -11,6 +11,16 @@
             <h4 class="text">Your potential savings : {{ cash + potential_cash }} $</h4>
         </div>
         <div class="panel-body">
+        {% if no_sold %}
+            <div class="alert alert-warning">
+                <h4>You can't sell more than you have.</h4>
+            </div>
+        {% endif %}
+        {% if no_integer %}
+            <div class="alert alert-warning">
+                <h4>Please enter positives integers</h4>
+            </div>
+        {% endif %}
             <form class="form" action="{{ url_for('sell') }}" method="post">
                 <fieldset>
                     <table class="table table-striped">
@@ -19,6 +29,7 @@
                                 <th>Stock</th>
                                 <th>Shares</th>
                                 <th>Actual price</th>
+                                <th>Last updated</th>
                                 <th>Potential value</th>
                                 <th>Send order</th>
                             </tr>
@@ -28,11 +39,12 @@
                                 <tr>
                                     <td>{{ row.stock_symbol }}</td>
                                     <td>{{ row.number_share }}</td>
-                                    <td>{{ row.price }} $</td>
-                                    <td>{{ row.price * row.number_share }} $</td>
+                                    <td>{{ row.actual_price }} $</td>
+                                    <td>{{ row.last_updated }}</td>
+                                    <td>{{ row.potential_value }} $</td>
                                     <td>
                                         <div class="form-group">
-                                            <input type="text" name="sell" placeholder="Number" />
+                                            <input type="text" name="{{ row.stock_symbol }}" placeholder="Number" />
                                         </div>
                                     </td>
                                 </tr>

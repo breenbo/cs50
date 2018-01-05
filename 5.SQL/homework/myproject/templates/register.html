@@ -5,6 +5,11 @@
 {% endblock %}
 
 {% block main %}
+    {% if not login %}
+        <div class="alert alert-warning">
+            <h4>Please enter a name and a password.</h4>
+        </div>
+    {% endif %}
     <form action="{{ url_for('register') }}" method="post">
         <fieldset>
             <div class="form-group">

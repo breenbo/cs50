@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+
+{% block title %}
+    History
+{% endblock %}
+
+{% block main %}
+    <div class="panel panel-primary">
+        <div class="panel-heading">
+            <h4>Buy History</h4>
+        </div>
+        <div class="panel-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Stock symbol</th>
+                        <th>Price</th>
+                        <th>Numbers</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in buy_history %}
+                    <tr>
+                        <td>{{ row.stock_symbol }}</td>
+                        <td>{{ row.price }}</td>
+                        <td>{{ row.number_share }}</td>
+                        <td>{{ row.date_time }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>    
+    <div class="panel panel-primary">
+        <div class="panel-heading">
+            <h4>Sell History</h4>
+        </div>
+        <div class="panel-body">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Stock symbol</th>
+                        <th>Price</th>
+                        <th>Numbers</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in sell_history %}
+                    <tr>
+                        <td>{{ row.stock_symbol }}</td>
+                        <td>{{ row.price }}</td>
+                        <td>{{ row.number_share }}</td>
+                        <td>{{ row.date_time }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>    
+{% endblock %}
