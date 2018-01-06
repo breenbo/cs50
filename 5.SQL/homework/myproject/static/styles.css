@@ -56,3 +56,12 @@ main td
 .panel {
     box-shadow : 0 0.5vw 0.5vw 0 rgba(0, 0, 0, 0.2), 0 0.5vw 0.5vw 0 rgba(0, 0, 0, 0.19);
 }
+
+.table-button {
+    text-align:right;
+}
+
+p {
+    text-align:right;
+    color:gray;
+}

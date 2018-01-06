@@ -114,31 +114,38 @@ def usd(value):
     return f"${value:,.2f}"
 
 
-def stock_transaction(transaction, db, user_id, cash, potential_cash):
-    portfolio_rows = db.execute("SELECT * FROM portfolio" +
-                                " WHERE user_id=:user_id",
-                                user_id=user_id)
-    # check if the stocks to be sold for each row of database
-    no_sold = False
+def pot_cash(portfolio_rows):
+    """ calcul potential cash of users stocks """
+    potential_cash = 0
     for row in portfolio_rows:
         # check every row and calculate global potential cash
         actual_price = row["actual_price"]
         potential_cash += actual_price * row["number_share"]
         potential_cash = round(potential_cash, 2)
 
-        session["potential_cash"] = potential_cash
+    return potential_cash
 
+
+def stock_transaction(transaction, db, user_id, cash, potential_cash):
+    portfolio_rows = db.execute("SELECT * FROM portfolio" +
+                                " WHERE user_id=:user_id",
+                                user_id=user_id)
+    # check if the stocks to be sold for each row of database
+    no_sold = False
+    potential_cash = pot_cash(portfolio_rows)
+
+    for row in portfolio_rows:
         stock_symbol = row["stock_symbol"]
         if request.form[stock_symbol] == "":
             # do nothing, no stock to sold
             # but recall that there is no integer in input
-            #  no_integer = True
             pass
         else:
             # check the user input
             try:
                 int(request.form[stock_symbol])
             except:
+                # bad input number
                 no_integer = True
                 if transaction == "sell":
                     return render_template("sell.html",
@@ -161,6 +168,7 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                 if transaction == "sell":
                     # set negatives values for numbers
                     number_move = - int(request.form[stock_symbol])
+                    # bad input number
                     if number_move > 0:
                         no_integer = True
                         return render_template("sell.html",
@@ -169,6 +177,7 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                                                potential_cash=potential_cash,
                                                no_sold=no_sold,
                                                no_integer=no_integer)
+                    # can't sell more than user have
                     if abs(number_move) > number_share:
                         no_sold = True
                         return render_template("sell.html",
@@ -181,14 +190,26 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                 elif transaction == "buy":
                     # set positives values for numbers
                     number_move = int(request.form[stock_symbol])
-                    if number_move < 0:
-                        no_integer = True
+                    if number_move < 0 and abs(number_move) > number_share:
+                        # can't sell more than we have
+                        no_sold = True
                         return render_template("index.html",
                                                username=session["user_name"].capitalize(),
                                                cash=cash,
                                                portfolio_rows=portfolio_rows,
                                                potential_cash=potential_cash,
-                                               no_integer=no_integer)
+                                               no_integer=no_integer,
+                                               no_sold=no_sold)
+
+                    # bad input number
+                    #  if number_move < 0:
+                        #  no_integer = True
+                        #  return render_template("index.html",
+                                               #  username=session["user_name"].capitalize(),
+                                               #  cash=cash,
+                                               #  portfolio_rows=portfolio_rows,
+                                               #  potential_cash=potential_cash,
+                                               #  no_integer=no_integer)
 
                 number_share += number_move
                 price = float(row["actual_price"])
@@ -239,6 +260,7 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                                stock_symbol=stock_symbol,
                                price=price,
                                number_move=abs(number_move))
+
                 elif transaction == "buy":
                     # update buy history
                     db.execute("INSERT INTO buy_history (" +
@@ -272,8 +294,10 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                                 " WHERE user_id=:user_id",
                                 user_id=user_id)
 
-    success = True
+    # update potential_cash with new values of stocks
+    potential_cash = pot_cash(portfolio_rows)
 
+    # display the results
     if transaction == "sell":
         return render_template("sell.html",
                                cash=cash,

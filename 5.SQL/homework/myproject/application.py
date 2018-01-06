@@ -4,7 +4,7 @@ from flask_session import Session
 from passlib.apps import custom_app_context as pwd_context
 from tempfile import mkdtemp
 
-from helpers import apology, login_required, lookup, usd, stock_transaction
+from helpers import apology, login_required, lookup, usd, stock_transaction, pot_cash
 
 # configure application
 app = Flask(__name__)
@@ -36,25 +36,27 @@ db = SQL("sqlite:///finance.db")
 @login_required
 # add portfolio_buy here for post method ? and index() for get method ?
 def index():
+    user_id = session["user_id"]
+    portfolio_rows = db.execute("SELECT * FROM portfolio" +
+                                " WHERE user_id=:user_id",
+                                user_id=user_id)
     if request.method == "GET":
         # default view.
         # contains a portfolio view
         # update prices each time and store them in portfolio database
-        user_id = session["user_id"]
-        portfolio_rows = db.execute("SELECT * FROM portfolio" +
-                                    " WHERE user_id=:user_id",
-                                    user_id=user_id)
-        # check the actual price of the portfolio's stock
-        # list of stock_symbol, shares, actual price
-        potential_cash = 0
+
+        potential_cash = pot_cash(portfolio_rows)
+
         for row in portfolio_rows:
             stock_symbol = row["stock_symbol"]
             actual_price = lookup(stock_symbol)["price"]
             # calculate the potential value of each stock
             row["actual_price"] = actual_price
-            potential_cash += actual_price * row["number_share"]
-            potential_cash = round(potential_cash, 2)
+            #  potential_cash += actual_price * row["number_share"]
+            #  potential_cash = round(potential_cash, 2)
+
             potential_value = actual_price * row["number_share"]
+
             # update stocks actual price in portfolio db
             db.execute("UPDATE portfolio" +
                        " SET" +
@@ -75,18 +77,21 @@ def index():
                                     " WHERE user_id=:user_id",
                                     user_id=user_id)
 
-        # set portfolio_rows as session to immediate use in sell page
+        # calculate potential cash with updated values
+        potential_cash = pot_cash(portfolio_rows)
+        cash = session["cash"]
 
         return render_template("index.html",
                                username=session["user_name"].capitalize(),
-                               cash=session["cash"],
+                               cash=cash,
                                portfolio_rows=portfolio_rows,
                                potential_cash=potential_cash)
 
     elif request.method == "POST":
         user_id = session["user_id"]
         cash = session["cash"]
-        potential_cash = 0
+        potential_cash = pot_cash(portfolio_rows)
+
         return stock_transaction("buy", db, user_id, cash, potential_cash)
 
 
@@ -110,10 +115,10 @@ def buy():
         symbol = request.form["stock"]
         # only one request, parse result in html with {{ result.subresult }}
         result = lookup(symbol)
+
         if result is None:
             quote = False
             return render_template("buy.html", quote=quote, cash=cash)
-            #  return apology("Sorry, unable to find the stock")
         # store result in session variable iot use later
         session["result"] = result
 
@@ -137,6 +142,7 @@ def bought():
     success = False
     cash = session["cash"]
     result = session["result"]
+
     if request.form["shares"] == "":
         number = False
     else:
@@ -160,7 +166,6 @@ def bought():
                                        result=result,
                                        quote=quote,
                                        number=number)
-                #  return apology("Please enter a positive integer")
 
             number = True
             # work with the datas now the user input is safe
@@ -397,7 +402,6 @@ def register():
             login = False
             return render_template("register.html",
                                    login=login)
-            #  return apology("Please enter a name and a password.")
         # store name and hashed password in db users (username, hash)
         db.execute("INSERT INTO users (username, hash) VALUES (:username," +
                    " :password)",
@@ -431,13 +435,10 @@ def sell():
 
     elif request.method == "GET":
         # check every row in portfolio_rows and calculate global potential cash
-        for row in portfolio_rows:
-            actual_price = row["actual_price"]
-            potential_cash += actual_price * row["number_share"]
-            potential_cash = round(potential_cash, 2)
+        potential_cash = pot_cash(portfolio_rows)
 
         return render_template("sell.html",
-                               cash=session["cash"],
+                               cash=cash,
                                portfolio_rows=portfolio_rows,
                                potential_cash=potential_cash,
                                no_sold=False,
