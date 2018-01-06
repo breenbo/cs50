@@ -126,11 +126,14 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
         potential_cash += actual_price * row["number_share"]
         potential_cash = round(potential_cash, 2)
 
+        session["potential_cash"] = potential_cash
+
         stock_symbol = row["stock_symbol"]
         if request.form[stock_symbol] == "":
             # do nothing, no stock to sold
             # but recall that there is no integer in input
-            no_integer = True
+            #  no_integer = True
+            pass
         else:
             # check the user input
             try:
@@ -139,41 +142,65 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                 no_integer = True
                 if transaction == "sell":
                     return render_template("sell.html",
-                                        cash=session["cash"],
-                                        portfolio_rows=portfolio_rows,
-                                        potential_cash=potential_cash,
-                                        no_sold=no_sold,
-                                        no_integer=no_integer)
+                                           cash=cash,
+                                           portfolio_rows=portfolio_rows,
+                                           potential_cash=potential_cash,
+                                           no_sold=no_sold,
+                                           no_integer=no_integer)
                 elif transaction == "buy":
-                    return apology("test of function except")
+                    return render_template("index.html",
+                                           username=session["user_name"].capitalize(),
+                                           cash=cash,
+                                           portfolio_rows=portfolio_rows,
+                                           potential_cash=potential_cash,
+                                           no_integer=no_integer)
             else:
                 no_integer = False
-                #  sell the numbers of stock
-                number_sold = int(request.form[stock_symbol])
                 number_share = int(row["number_share"])
-                if number_sold > number_share:
-                    no_sold = True
-                if number_share < 0:
-                    no_integer = True
-
                 # update the databases of buy/sold stocks
                 if transaction == "sell":
-                    # set negatives values for numbers and positive for amount
-                    pass
-                elif transaction == "buy":
-                    # set positives values for numbers and negative for amount
-                    pass
+                    # set negatives values for numbers
+                    number_move = - int(request.form[stock_symbol])
+                    if number_move > 0:
+                        no_integer = True
+                        return render_template("sell.html",
+                                               cash=cash,
+                                               portfolio_rows=portfolio_rows,
+                                               potential_cash=potential_cash,
+                                               no_sold=no_sold,
+                                               no_integer=no_integer)
+                    if abs(number_move) > number_share:
+                        no_sold = True
+                        return render_template("sell.html",
+                                               cash=cash,
+                                               portfolio_rows=portfolio_rows,
+                                               potential_cash=potential_cash,
+                                               no_sold=no_sold,
+                                               no_integer=no_integer)
 
-                number_share += number_sold
+                elif transaction == "buy":
+                    # set positives values for numbers
+                    number_move = int(request.form[stock_symbol])
+                    if number_move < 0:
+                        no_integer = True
+                        return render_template("index.html",
+                                               username=session["user_name"].capitalize(),
+                                               cash=cash,
+                                               portfolio_rows=portfolio_rows,
+                                               potential_cash=potential_cash,
+                                               no_integer=no_integer)
+
+                number_share += number_move
                 price = float(row["actual_price"])
                 potential_value = price * number_share
                 potential_value = round(potential_value, 2)
 
-                sold_amount = price * number_sold
-                sold_amount = round(sold_amount, 2)
+                # amount is oposite sign of number_move
+                move_amount = - (price * number_move)
+                move_amount = round(move_amount, 2)
 
-                # add sold_amount to user cash
-                cash += sold_amount
+                # add move_amount to user cash
+                cash += move_amount
                 cash = round(cash, 2)
                 session["cash"] = cash
 
@@ -191,25 +218,47 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                            potential_value=potential_value,
                            user_id=user_id,
                            stock_symbol=stock_symbol)
+
+                if transaction == "sell":
                 # update sell_history
-                db.execute("INSERT INTO sell_history (" +
-                           " user_id," +
-                           " stock_symbol," +
-                           " price," +
-                           " number_share," +
-                           " date_time" +
-                           ")" +
-                           " VALUES (" +
-                           " :user_id," +
-                           " :stock_symbol," +
-                           " :price," +
-                           " :number_sold," +
-                           " datetime('now', 'localtime')" +
-                           ")",
-                           user_id=user_id,
-                           stock_symbol=stock_symbol,
-                           price=price,
-                           number_sold=number_sold)
+                    db.execute("INSERT INTO sell_history (" +
+                               " user_id," +
+                               " stock_symbol," +
+                               " price," +
+                               " number_share," +
+                               " date_time" +
+                               ")" +
+                               " VALUES (" +
+                               " :user_id," +
+                               " :stock_symbol," +
+                               " :price," +
+                               " :number_move," +
+                               " datetime('now', 'localtime')" +
+                               ")",
+                               user_id=user_id,
+                               stock_symbol=stock_symbol,
+                               price=price,
+                               number_move=abs(number_move))
+                elif transaction == "buy":
+                    # update buy history
+                    db.execute("INSERT INTO buy_history (" +
+                               " user_id," +
+                               " stock_symbol," +
+                               " price," +
+                               " number_share," +
+                               " date_time" +
+                               ")" +
+                               " VALUES (" +
+                               " :user_id," +
+                               " :stock_symbol," +
+                               " :price," +
+                               " :number_move," +
+                               " datetime('now', 'localtime')" +
+                               ")",
+                               user_id=user_id,
+                               stock_symbol=stock_symbol,
+                               price=price,
+                               number_move=abs(number_move))
 
     # delete all rows with no shares
     db.execute("DELETE FROM portfolio" +
@@ -223,9 +272,18 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                                 " WHERE user_id=:user_id",
                                 user_id=user_id)
 
-    return render_template("sell.html",
-                           cash=session["cash"],
-                           portfolio_rows=portfolio_rows,
-                           potential_cash=potential_cash,
-                           no_sold=no_sold,
-                           no_integer=no_integer)
+    success = True
+
+    if transaction == "sell":
+        return render_template("sell.html",
+                               cash=cash,
+                               portfolio_rows=portfolio_rows,
+                               potential_cash=potential_cash,
+                               no_sold=no_sold,
+                               no_integer=no_integer)
+    elif transaction == "buy":
+        return render_template("index.html",
+                               username=session["user_name"].capitalize(),
+                               cash=cash,
+                               portfolio_rows=portfolio_rows,
+                               potential_cash=potential_cash)
