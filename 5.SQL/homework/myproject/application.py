@@ -525,6 +525,7 @@ def sell():
                                potential_cash=potential_cash,
                                no_sold=no_sold,
                                no_integer=no_integer)
+
     elif request.method == "GET":
         # check every row in portfolio_rows and calculate global potential cash
         for row in portfolio_rows:
