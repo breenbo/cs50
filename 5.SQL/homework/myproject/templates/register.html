@@ -10,6 +10,16 @@
             <h4>Please enter a name and a password.</h4>
         </div>
     {% endif %}
+    {% if not confirm %}
+        <div class="alert alert-warning">
+            <h4>Passwords don't match, please try again.</h4>
+        </div>
+    {% endif %}
+    {% if not new_name %}
+        <div class="alert alert-warning">
+            <h4>Sorry, name already taken, please try another one.</h4>
+        </div>
+    {% endif %}
     <form action="{{ url_for('register') }}" method="post">
         <fieldset>
             <div class="form-group">
@@ -17,6 +27,9 @@
             </div>
             <div class="form-group">
                 <input class="form-control" name="password" placeholder="Password" type="password"/>
+            </div>
+            <div class="form-group">
+                <input class="form-control" name="confirmation" placeholder="Confirm Password" type="password"/>
             </div>
             <div class="form-group">
                 <button class="btn btn-info" type="submit">Register</button>

@@ -396,12 +396,22 @@ def register():
     """Register user into database users."""
     # check if post method -> protect from get method
     login = True
+    confirm = True
+    new_name = True
     if request.method == "POST":
         # check if register correct (non empty)
-        if request.form["username"] == "" or request.form["password"] == "":
+        if request.form["username"] == "" or request.form["password"] == "" or request.form["confirmation"] == "":
             login = False
             return render_template("register.html",
-                                   login=login)
+                                   login=login,
+                                   confirm=confirm,
+                                   new_name=new_name)
+        if request.form["password"] != request.form["confirmation"]:
+            confirm = False
+            return render_template("register.html",
+                                   login=login,
+                                   confirm=confirm,
+                                   new_name=new_name)
         # store name and hashed password in db users (username, hash)
         db.execute("INSERT INTO users (username, hash) VALUES (:username," +
                    " :password)",
@@ -412,7 +422,9 @@ def register():
     # else if user reached route via GET (as by clicking a link or via redirect)
     else:
         return render_template("register.html",
-                               login=login)
+                               login=login,
+                               confirm=confirm,
+                               new_name=new_name)
 
 
 @app.route("/sell", methods=["GET", "POST"])
