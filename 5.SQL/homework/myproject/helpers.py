@@ -153,14 +153,14 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                                            portfolio_rows=portfolio_rows,
                                            potential_cash=potential_cash,
                                            no_sold=no_sold,
-                                           no_integer=no_integer)
+                                           no_integer=no_integer), 400
                 elif transaction == "buy":
                     return render_template("index.html",
                                            username=session["user_name"].capitalize(),
                                            cash=cash,
                                            portfolio_rows=portfolio_rows,
                                            potential_cash=potential_cash,
-                                           no_integer=no_integer)
+                                           no_integer=no_integer), 400
             else:
                 no_integer = False
                 number_share = int(row["number_share"])
@@ -176,7 +176,7 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                                                portfolio_rows=portfolio_rows,
                                                potential_cash=potential_cash,
                                                no_sold=no_sold,
-                                               no_integer=no_integer)
+                                               no_integer=no_integer), 400
                     # can't sell more than user have
                     if abs(number_move) > number_share:
                         no_sold = True
@@ -185,7 +185,7 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                                                portfolio_rows=portfolio_rows,
                                                potential_cash=potential_cash,
                                                no_sold=no_sold,
-                                               no_integer=no_integer)
+                                               no_integer=no_integer), 400
 
                 elif transaction == "buy":
                     # set positives values for numbers
@@ -199,17 +199,7 @@ def stock_transaction(transaction, db, user_id, cash, potential_cash):
                                                portfolio_rows=portfolio_rows,
                                                potential_cash=potential_cash,
                                                no_integer=no_integer,
-                                               no_sold=no_sold)
-
-                    # bad input number
-                    #  if number_move < 0:
-                        #  no_integer = True
-                        #  return render_template("index.html",
-                                               #  username=session["user_name"].capitalize(),
-                                               #  cash=cash,
-                                               #  portfolio_rows=portfolio_rows,
-                                               #  potential_cash=potential_cash,
-                                               #  no_integer=no_integer)
+                                               no_sold=no_sold), 400
 
                 number_share += number_move
                 price = float(row["actual_price"])

@@ -52,8 +52,6 @@ def index():
             actual_price = lookup(stock_symbol)["price"]
             # calculate the potential value of each stock
             row["actual_price"] = actual_price
-            #  potential_cash += actual_price * row["number_share"]
-            #  potential_cash = round(potential_cash, 2)
 
             potential_value = actual_price * row["number_share"]
 
@@ -109,8 +107,7 @@ def buy():
         if request.form["stock"] == "":
             # Personnel enhancement
             quote = False
-            return render_template("buy.html", quote=quote, cash=cash)
-            #  return apology("Please enter a valid stock symbol")
+            return render_template("buy.html", quote=quote, cash=cash), 400
 
         symbol = request.form["stock"]
         # only one request, parse result in html with {{ result.subresult }}
@@ -118,13 +115,15 @@ def buy():
 
         if result is None:
             quote = False
-            return render_template("buy.html", quote=quote, cash=cash)
+            return render_template("buy.html", quote=quote, cash=cash), 400
         # store result in session variable iot use later
         session["result"] = result
+        price = usd(result["price"])
 
         return render_template("buy.html",
                                cash=cash,
                                result=result,
+                               price=price,
                                quote=quote,
                                number=number)
 
@@ -156,7 +155,7 @@ def bought():
                                    cash=cash,
                                    result=result,
                                    quote=quote,
-                                   number=number)
+                                   number=number), 400
         else:
             # check if it's positive
             if int(request.form["shares"]) < 0:
@@ -165,7 +164,7 @@ def bought():
                                        cash=cash,
                                        result=result,
                                        quote=quote,
-                                       number=number)
+                                       number=number), 400
 
             number = True
             # work with the datas now the user input is safe
@@ -180,7 +179,7 @@ def bought():
             cash = round(cash, 2)
             # update session["cash"] for later use
             session["cash"] = cash
-            # return apology if total bought price > available cash
+
             if cash < 0:
                 return apology("Sorry, you're to poor for that...")
 
@@ -258,10 +257,12 @@ def bought():
 
             # success var to display success message in buy.html
             success = True
+            price = usd(result["price"])
 
             return render_template("buy.html",
                                    cash=cash,
                                    result=result,
+                                   price=price,
                                    quote=True,
                                    number=number,
                                    success=success,
@@ -377,18 +378,25 @@ def quote():
         if request.form["symbol"] == "":
             # Personnel enhancement
             quote = False
-            return render_template("quote.html", quote=quote)
-            #  return apology("Please enter a valid stock symbol")
+            return render_template("quote.html",
+                                   quote=quote), 400
         symbol = request.form["symbol"]
         # only one request, parse result in html with {{ result.subresult }}
         result = lookup(symbol)
-        if result == None:
+        if result is None:
             quote = False
-            return render_template("quote.html", quote=quote)
-        return render_template("quoted.html", result=result, quote=quote)
+            return render_template("quote.html",
+                                   quote=quote), 400
+        # all is good, display results
+        price = usd(result["price"])
+        return render_template("quoted.html",
+                               result=result,
+                               price=price,
+                               quote=quote)
 
     if request.method == "GET":
-        return render_template("quote.html", quote=quote)
+        return render_template("quote.html",
+                               quote=quote)
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -398,20 +406,34 @@ def register():
     login = True
     confirm = True
     new_name = True
+    user_names = db.execute("SELECT username FROM users")
+
     if request.method == "POST":
         # check if register correct (non empty)
-        if request.form["username"] == "" or request.form["password"] == "" or request.form["confirmation"] == "":
+        if request.form["username"] == "" or request.form["password"] == "" \
+                or request.form["confirmation"] == "":
             login = False
+            # add code 400 to tell that it has failed
             return render_template("register.html",
                                    login=login,
                                    confirm=confirm,
-                                   new_name=new_name)
+                                   new_name=new_name), 400
+        # check if password and confirm matches
         if request.form["password"] != request.form["confirmation"]:
             confirm = False
             return render_template("register.html",
                                    login=login,
                                    confirm=confirm,
-                                   new_name=new_name)
+                                   new_name=new_name), 400
+        # check if name already exists
+        for i in range(len(user_names)):
+            if user_names[i]["username"] == request.form["username"]:
+                new_name = False
+                return render_template("register.html",
+                                    login=login,
+                                    confirm=confirm,
+                                    new_name=new_name), 400
+
         # store name and hashed password in db users (username, hash)
         db.execute("INSERT INTO users (username, hash) VALUES (:username," +
                    " :password)",
@@ -424,7 +446,8 @@ def register():
         return render_template("register.html",
                                login=login,
                                confirm=confirm,
-                               new_name=new_name)
+                               new_name=new_name,
+                               user_names=user_names)
 
 
 @app.route("/sell", methods=["GET", "POST"])
